@@ -10,7 +10,7 @@ jobs:
           java-version: 17
       - name: Tulis project
         run: |
-          mkdir -p app/src/main/java/com/blokir/takdikenal app/src/main/res/layout app/src/main/res/values
+          mkdir -p app/src/main/java/com/blokir/takdikenal app/src/main/res/layout app/src/main/res/values app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26
           cat > settings.gradle.kts << 'EOF'
           pluginManagement {
               repositories { google(); mavenCentral(); gradlePluginPortal() }
@@ -43,8 +43,8 @@ jobs:
                   applicationId = "com.blokir.takdikenal"
                   minSdk = 29
                   targetSdk = 34
-                  versionCode = 1
-                  versionName = "1.0"
+                  versionCode = 2
+                  versionName = "2.0"
               }
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -55,6 +55,8 @@ jobs:
           dependencies {
               implementation("androidx.core:core-ktx:1.13.1")
               implementation("androidx.appcompat:appcompat:1.7.0")
+              implementation("androidx.recyclerview:recyclerview:1.3.2")
+              implementation("com.google.android.material:material:1.12.0")
           }
           EOF
           cat > app/src/main/AndroidManifest.xml << 'EOF'
@@ -62,6 +64,8 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.READ_CONTACTS" />
               <application
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher"
                   android:label="Blokir Tak Dikenal"
                   android:theme="@style/AppTheme">
                   <activity android:name=".MainActivity" android:exported="true">
@@ -84,76 +88,262 @@ jobs:
           cat > app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.DayNight.DarkActionBar" />
+              <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
+                  <item name="colorPrimary">@color/primary</item>
+              </style>
           </resources>
+          EOF
+          cat > app/src/main/res/values/colors.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="primary">#0F766E</color>
+          </resources>
+          EOF
+          cat > app/src/main/res/drawable/bg_header_on.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <gradient android:angle="315" android:endColor="#0B6E8A" android:startColor="#0F9D75" />
+              <corners android:bottomLeftRadius="32dp" android:bottomRightRadius="32dp" />
+          </shape>
+          EOF
+          cat > app/src/main/res/drawable/bg_header_off.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <gradient android:angle="315" android:endColor="#DC2626" android:startColor="#F59E0B" />
+              <corners android:bottomLeftRadius="32dp" android:bottomRightRadius="32dp" />
+          </shape>
+          EOF
+          cat > app/src/main/res/drawable/bg_badge.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="#1FEF4444" />
+              <corners android:radius="12dp" />
+          </shape>
+          EOF
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <group
+                  android:scaleX="2.2"
+                  android:scaleY="2.2"
+                  android:translateX="27.6"
+                  android:translateY="27.6">
+                  <path
+                      android:fillColor="#FFFFFF"
+                      android:pathData="M12,1L3,5v6c0,5.55 3.84,10.74 9,12 5.16,-1.26 9,-6.45 9,-12V5l-9,-4z" />
+              </group>
+          </vector>
+          EOF
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/primary" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
           EOF
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
-              android:fitsSystemWindows="true"
-              android:orientation="vertical"
-              android:padding="16dp">
+              android:background="?attr/colorSurface"
+              android:orientation="vertical">
           
-              <TextView
-                  android:id="@+id/status"
+              <LinearLayout
+                  android:id="@+id/header"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:textSize="18sp" />
-          
-              <Button
-                  android:id="@+id/btnActivate"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:layout_marginTop="12dp"
-                  android:text="Aktifkan perlindungan" />
-          
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:layout_marginTop="24dp"
-                  android:text="Riwayat panggilan diblokir"
-                  android:textSize="16sp"
-                  android:textStyle="bold" />
-          
-              <ScrollView
-                  android:layout_width="match_parent"
-                  android:layout_height="0dp"
-                  android:layout_marginTop="8dp"
-                  android:layout_weight="1">
+                  android:background="@drawable/bg_header_off"
+                  android:gravity="center_horizontal"
+                  android:orientation="vertical"
+                  android:paddingHorizontal="24dp"
+                  android:paddingTop="36dp"
+                  android:paddingBottom="32dp">
           
                   <TextView
-                      android:id="@+id/history"
-                      android:layout_width="match_parent"
+                      android:id="@+id/icon"
+                      android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:textSize="15sp" />
-              </ScrollView>
+                      android:textSize="56sp" />
           
-              <Button
-                  android:id="@+id/btnClear"
+                  <TextView
+                      android:id="@+id/title"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="8dp"
+                      android:textColor="#FFFFFF"
+                      android:textSize="24sp"
+                      android:textStyle="bold" />
+          
+                  <TextView
+                      android:id="@+id/subtitle"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="4dp"
+                      android:alpha="0.9"
+                      android:gravity="center"
+                      android:textColor="#FFFFFF"
+                      android:textSize="15sp" />
+              </LinearLayout>
+          
+              <com.google.android.material.button.MaterialButton
+                  android:id="@+id/btnActivate"
+                  android:layout_width="match_parent"
+                  android:layout_height="56dp"
+                  android:layout_margin="16dp"
+                  android:text="Aktifkan perlindungan"
+                  android:textSize="16sp"
+                  app:cornerRadius="16dp" />
+          
+              <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="Hapus riwayat" />
+                  android:layout_marginTop="8dp"
+                  android:gravity="center_vertical"
+                  android:orientation="horizontal"
+                  android:paddingStart="20dp"
+                  android:paddingEnd="8dp">
+          
+                  <TextView
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:text="Panggilan diblokir"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
+          
+                  <com.google.android.material.button.MaterialButton
+                      android:id="@+id/btnClear"
+                      style="@style/Widget.Material3.Button.TextButton"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Hapus semua" />
+              </LinearLayout>
+          
+              <FrameLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_weight="1">
+          
+                  <androidx.recyclerview.widget.RecyclerView
+                      android:id="@+id/list"
+                      android:layout_width="match_parent"
+                      android:layout_height="match_parent"
+                      android:clipToPadding="false"
+                      android:paddingBottom="16dp" />
+          
+                  <TextView
+                      android:id="@+id/empty"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_gravity="center"
+                      android:gravity="center"
+                      android:padding="32dp"
+                      android:text="Belum ada panggilan yang diblokir.\nNomor yang tidak ada di kontak akan muncul di sini secara otomatis."
+                      android:textColor="?android:attr/textColorSecondary" />
+              </FrameLayout>
           </LinearLayout>
+          EOF
+          cat > app/src/main/res/layout/item_blocked.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <com.google.android.material.card.MaterialCardView
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              style="@style/Widget.Material3.CardView.Outlined"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginHorizontal="16dp"
+              android:layout_marginVertical="5dp"
+              app:cardCornerRadius="16dp">
+          
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:gravity="center_vertical"
+                  android:orientation="horizontal"
+                  android:padding="14dp">
+          
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="🚫"
+                      android:textSize="26sp" />
+          
+                  <LinearLayout
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_marginStart="12dp"
+                      android:layout_weight="1"
+                      android:orientation="vertical">
+          
+                      <TextView
+                          android:id="@+id/number"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:textSize="17sp"
+                          android:textStyle="bold" />
+          
+                      <TextView
+                          android:id="@+id/time"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:textColor="?android:attr/textColorSecondary"
+                          android:textSize="13sp" />
+                  </LinearLayout>
+          
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:background="@drawable/bg_badge"
+                      android:paddingHorizontal="10dp"
+                      android:paddingVertical="4dp"
+                      android:text="Diblokir"
+                      android:textColor="#DC2626"
+                      android:textSize="12sp"
+                      android:textStyle="bold" />
+              </LinearLayout>
+          </com.google.android.material.card.MaterialCardView>
           EOF
           cat > app/src/main/java/com/blokir/takdikenal/MainActivity.kt << 'EOF'
           package com.blokir.takdikenal
           
           import android.Manifest
           import android.app.role.RoleManager
+          import android.content.SharedPreferences
           import android.content.pm.PackageManager
           import android.os.Bundle
-          import android.widget.Button
+          import android.view.LayoutInflater
+          import android.view.View
+          import android.view.ViewGroup
           import android.widget.TextView
           import androidx.activity.result.contract.ActivityResultContracts
           import androidx.appcompat.app.AppCompatActivity
           import androidx.core.content.ContextCompat
+          import androidx.recyclerview.widget.LinearLayoutManager
+          import androidx.recyclerview.widget.RecyclerView
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
           
           class MainActivity : AppCompatActivity() {
           
-              private lateinit var status: TextView
-              private lateinit var history: TextView
+              private lateinit var header: View
+              private lateinit var tvIcon: TextView
+              private lateinit var tvTitle: TextView
+              private lateinit var tvSubtitle: TextView
+              private lateinit var tvEmpty: TextView
+              private lateinit var btnActivate: View
+              private val adapter = BlockedAdapter()
+          
+              // Dipanggil otomatis setiap ada panggilan baru yang diblokir
+              private val logListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+                  runOnUiThread { refresh() }
+              }
           
               private val askContacts =
                   registerForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
@@ -163,12 +353,30 @@ jobs:
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
-                  status = findViewById(R.id.status)
-                  history = findViewById(R.id.history)
-                  findViewById<Button>(R.id.btnActivate).setOnClickListener { activate() }
-                  findViewById<Button>(R.id.btnClear).setOnClickListener {
+                  header = findViewById(R.id.header)
+                  tvIcon = findViewById(R.id.icon)
+                  tvTitle = findViewById(R.id.title)
+                  tvSubtitle = findViewById(R.id.subtitle)
+                  tvEmpty = findViewById(R.id.empty)
+                  btnActivate = findViewById(R.id.btnActivate)
+                  findViewById<RecyclerView>(R.id.list).apply {
+                      layoutManager = LinearLayoutManager(this@MainActivity)
+                      adapter = this@MainActivity.adapter
+                  }
+                  btnActivate.setOnClickListener { activate() }
+                  findViewById<View>(R.id.btnClear).setOnClickListener {
                       LogStore.clear(this); refresh()
                   }
+              }
+          
+              override fun onStart() {
+                  super.onStart()
+                  LogStore.prefs(this).registerOnSharedPreferenceChangeListener(logListener)
+              }
+          
+              override fun onStop() {
+                  LogStore.prefs(this).unregisterOnSharedPreferenceChangeListener(logListener)
+                  super.onStop()
               }
           
               override fun onResume() {
@@ -194,12 +402,47 @@ jobs:
               }
           
               private fun refresh() {
-                  status.text = if (hasContacts() && hasRole())
-                      "✅ Aktif: panggilan dari nomor di luar kontak diblokir otomatis"
-                  else
-                      "⚠️ Belum aktif. Ketuk tombol di bawah."
+                  val active = hasContacts() && hasRole()
                   val list = LogStore.get(this)
-                  history.text = if (list.isEmpty()) "Belum ada panggilan yang diblokir." else list.joinToString("\n")
+          
+                  header.setBackgroundResource(if (active) R.drawable.bg_header_on else R.drawable.bg_header_off)
+                  tvIcon.text = if (active) "🛡️" else "⚠️"
+                  tvTitle.text = if (active) "Perlindungan aktif" else "Belum aktif"
+                  tvSubtitle.text = if (active)
+                      "${list.size} panggilan tak dikenal diblokir"
+                  else
+                      "Ketuk tombol di bawah untuk mengaktifkan"
+                  btnActivate.visibility = if (active) View.GONE else View.VISIBLE
+          
+                  adapter.submit(list)
+                  tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+              }
+          }
+          
+          class BlockedAdapter : RecyclerView.Adapter<BlockedAdapter.VH>() {
+              private var items: List<LogStore.Entry> = emptyList()
+              private val fmt = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID"))
+          
+              fun submit(list: List<LogStore.Entry>) {
+                  items = list
+                  notifyDataSetChanged()
+              }
+          
+              class VH(v: View) : RecyclerView.ViewHolder(v) {
+                  val number: TextView = v.findViewById(R.id.number)
+                  val time: TextView = v.findViewById(R.id.time)
+              }
+          
+              override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = VH(
+                  LayoutInflater.from(parent.context).inflate(R.layout.item_blocked, parent, false)
+              )
+          
+              override fun getItemCount() = items.size
+          
+              override fun onBindViewHolder(holder: VH, position: Int) {
+                  val e = items[position]
+                  holder.number.text = e.number
+                  holder.time.text = fmt.format(Date(e.time))
               }
           }
           EOF
@@ -208,26 +451,22 @@ jobs:
           
           import android.Manifest
           import android.content.Context
+          import android.content.SharedPreferences
           import android.content.pm.PackageManager
           import android.net.Uri
           import android.provider.ContactsContract
           import android.telecom.Call
           import android.telecom.CallScreeningService
           import androidx.core.content.ContextCompat
-          import java.text.SimpleDateFormat
-          import java.util.Date
-          import java.util.Locale
           
           class CallBlockerService : CallScreeningService() {
           
               override fun onScreenCall(details: Call.Details) {
                   val allow = CallResponse.Builder().build()
           
-                  // Hanya panggilan masuk
                   if (details.callDirection != Call.Details.DIRECTION_INCOMING) {
                       respondToCall(details, allow); return
                   }
-                  // Tanpa izin kontak, jangan blokir apa pun (supaya tidak memblokir semua)
                   val granted = ContextCompat.checkSelfPermission(
                       this, Manifest.permission.READ_CONTACTS
                   ) == PackageManager.PERMISSION_GRANTED
@@ -238,7 +477,6 @@ jobs:
                       respondToCall(details, allow); return
                   }
           
-                  // Tidak dikenal (atau nomor disembunyikan): tolak + catat
                   LogStore.add(this, if (number.isNullOrBlank()) "Nomor disembunyikan" else number)
                   respondToCall(
                       details,
@@ -258,29 +496,39 @@ jobs:
                       uri, arrayOf(ContactsContract.PhoneLookup._ID), null, null, null
                   )?.use { it.count > 0 } ?: false
               } catch (e: Exception) {
-                  true // jika pengecekan gagal, izinkan panggilan
+                  true
               }
           }
           
           object LogStore {
+              data class Entry(val time: Long, val number: String)
+          
               private const val PREF = "blokir_log"
-              private const val KEY = "entries"
-              private const val MAX = 100
+              private const val KEY = "entries_v2"
+              private const val MAX = 200
+          
+              fun prefs(ctx: Context): SharedPreferences =
+                  ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
           
               fun add(ctx: Context, number: String) {
-                  val time = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("id", "ID")).format(Date())
-                  val updated = (listOf("$time  $number") + get(ctx)).take(MAX)
-                  ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-                      .edit().putString(KEY, updated.joinToString("\n")).apply()
+                  val line = "${System.currentTimeMillis()}|$number"
+                  val updated = (listOf(line) + raw(ctx)).take(MAX)
+                  prefs(ctx).edit().putString(KEY, updated.joinToString("\n")).apply()
               }
           
-              fun get(ctx: Context): List<String> {
-                  val s = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString(KEY, "") ?: ""
-                  return if (s.isEmpty()) emptyList() else s.split("\n")
+              fun get(ctx: Context): List<Entry> = raw(ctx).mapNotNull { l ->
+                  val p = l.split("|", limit = 2)
+                  val t = p[0].toLongOrNull()
+                  if (p.size == 2 && t != null) Entry(t, p[1]) else null
               }
           
               fun clear(ctx: Context) {
-                  ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().remove(KEY).apply()
+                  prefs(ctx).edit().remove(KEY).apply()
+              }
+          
+              private fun raw(ctx: Context): List<String> {
+                  val s = prefs(ctx).getString(KEY, "") ?: ""
+                  return if (s.isEmpty()) emptyList() else s.split("\n")
               }
           }
           EOF
