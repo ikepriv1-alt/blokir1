@@ -1,0 +1,294 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Tulis project
+        run: |
+          mkdir -p app/src/main/java/com/blokir/takdikenal app/src/main/res/layout app/src/main/res/values
+          cat > settings.gradle.kts << 'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "BlokirTakDikenal"
+          include(":app")
+          EOF
+          cat > build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2g
+          EOF
+          cat > app/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.blokir.takdikenal"
+              compileSdk = 34
+              defaultConfig {
+                  applicationId = "com.blokir.takdikenal"
+                  minSdk = 29
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.appcompat:appcompat:1.7.0")
+          }
+          EOF
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.READ_CONTACTS" />
+              <application
+                  android:label="Blokir Tak Dikenal"
+                  android:theme="@style/AppTheme">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <service
+                      android:name=".CallBlockerService"
+                      android:exported="true"
+                      android:permission="android.permission.BIND_SCREENING_SERVICE">
+                      <intent-filter>
+                          <action android:name="android.telecom.CallScreeningService" />
+                      </intent-filter>
+                  </service>
+              </application>
+          </manifest>
+          EOF
+          cat > app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.DayNight.DarkActionBar" />
+          </resources>
+          EOF
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:fitsSystemWindows="true"
+              android:orientation="vertical"
+              android:padding="16dp">
+          
+              <TextView
+                  android:id="@+id/status"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:textSize="18sp" />
+          
+              <Button
+                  android:id="@+id/btnActivate"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="12dp"
+                  android:text="Aktifkan perlindungan" />
+          
+              <TextView
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="24dp"
+                  android:text="Riwayat panggilan diblokir"
+                  android:textSize="16sp"
+                  android:textStyle="bold" />
+          
+              <ScrollView
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_marginTop="8dp"
+                  android:layout_weight="1">
+          
+                  <TextView
+                      android:id="@+id/history"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:textSize="15sp" />
+              </ScrollView>
+          
+              <Button
+                  android:id="@+id/btnClear"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Hapus riwayat" />
+          </LinearLayout>
+          EOF
+          cat > app/src/main/java/com/blokir/takdikenal/MainActivity.kt << 'EOF'
+          package com.blokir.takdikenal
+          
+          import android.Manifest
+          import android.app.role.RoleManager
+          import android.content.pm.PackageManager
+          import android.os.Bundle
+          import android.widget.Button
+          import android.widget.TextView
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.ContextCompat
+          
+          class MainActivity : AppCompatActivity() {
+          
+              private lateinit var status: TextView
+              private lateinit var history: TextView
+          
+              private val askContacts =
+                  registerForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
+              private val askRole =
+                  registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh() }
+          
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_main)
+                  status = findViewById(R.id.status)
+                  history = findViewById(R.id.history)
+                  findViewById<Button>(R.id.btnActivate).setOnClickListener { activate() }
+                  findViewById<Button>(R.id.btnClear).setOnClickListener {
+                      LogStore.clear(this); refresh()
+                  }
+              }
+          
+              override fun onResume() {
+                  super.onResume()
+                  refresh()
+              }
+          
+              private fun hasContacts() = ContextCompat.checkSelfPermission(
+                  this, Manifest.permission.READ_CONTACTS
+              ) == PackageManager.PERMISSION_GRANTED
+          
+              private fun roleManager() = getSystemService(RoleManager::class.java)
+          
+              private fun hasRole() = roleManager().isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+          
+              private fun activate() {
+                  if (!hasContacts()) {
+                      askContacts.launch(Manifest.permission.READ_CONTACTS); return
+                  }
+                  if (!hasRole()) {
+                      askRole.launch(roleManager().createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                  }
+              }
+          
+              private fun refresh() {
+                  status.text = if (hasContacts() && hasRole())
+                      "✅ Aktif: panggilan dari nomor di luar kontak diblokir otomatis"
+                  else
+                      "⚠️ Belum aktif. Ketuk tombol di bawah."
+                  val list = LogStore.get(this)
+                  history.text = if (list.isEmpty()) "Belum ada panggilan yang diblokir." else list.joinToString("\n")
+              }
+          }
+          EOF
+          cat > app/src/main/java/com/blokir/takdikenal/CallBlockerService.kt << 'EOF'
+          package com.blokir.takdikenal
+          
+          import android.Manifest
+          import android.content.Context
+          import android.content.pm.PackageManager
+          import android.net.Uri
+          import android.provider.ContactsContract
+          import android.telecom.Call
+          import android.telecom.CallScreeningService
+          import androidx.core.content.ContextCompat
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
+          
+          class CallBlockerService : CallScreeningService() {
+          
+              override fun onScreenCall(details: Call.Details) {
+                  val allow = CallResponse.Builder().build()
+          
+                  // Hanya panggilan masuk
+                  if (details.callDirection != Call.Details.DIRECTION_INCOMING) {
+                      respondToCall(details, allow); return
+                  }
+                  // Tanpa izin kontak, jangan blokir apa pun (supaya tidak memblokir semua)
+                  val granted = ContextCompat.checkSelfPermission(
+                      this, Manifest.permission.READ_CONTACTS
+                  ) == PackageManager.PERMISSION_GRANTED
+                  if (!granted) { respondToCall(details, allow); return }
+          
+                  val number = details.handle?.schemeSpecificPart
+                  if (!number.isNullOrBlank() && isInContacts(number)) {
+                      respondToCall(details, allow); return
+                  }
+          
+                  // Tidak dikenal (atau nomor disembunyikan): tolak + catat
+                  LogStore.add(this, if (number.isNullOrBlank()) "Nomor disembunyikan" else number)
+                  respondToCall(
+                      details,
+                      CallResponse.Builder()
+                          .setDisallowCall(true)
+                          .setRejectCall(true)
+                          .setSkipNotification(true)
+                          .build()
+                  )
+              }
+          
+              private fun isInContacts(number: String): Boolean = try {
+                  val uri = Uri.withAppendedPath(
+                      ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number)
+                  )
+                  contentResolver.query(
+                      uri, arrayOf(ContactsContract.PhoneLookup._ID), null, null, null
+                  )?.use { it.count > 0 } ?: false
+              } catch (e: Exception) {
+                  true // jika pengecekan gagal, izinkan panggilan
+              }
+          }
+          
+          object LogStore {
+              private const val PREF = "blokir_log"
+              private const val KEY = "entries"
+              private const val MAX = 100
+          
+              fun add(ctx: Context, number: String) {
+                  val time = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("id", "ID")).format(Date())
+                  val updated = (listOf("$time  $number") + get(ctx)).take(MAX)
+                  ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+                      .edit().putString(KEY, updated.joinToString("\n")).apply()
+              }
+          
+              fun get(ctx: Context): List<String> {
+                  val s = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString(KEY, "") ?: ""
+                  return if (s.isEmpty()) emptyList() else s.split("\n")
+              }
+          
+              fun clear(ctx: Context) {
+                  ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().remove(KEY).apply()
+              }
+          }
+          EOF
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlokirTakDikenal-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
